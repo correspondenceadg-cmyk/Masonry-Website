@@ -6,6 +6,10 @@ from bs4 import BeautifulSoup
 import json
 import uvicorn
 import os
+import subprocess
+import tempfile
+import shutil
+from pathlib import Path
 
 app = FastAPI()
 app.add_middleware(
@@ -15,6 +19,37 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- ON-THE-FLY DECOMPRESSION OF DATA CACHE ---
+DATA_CACHE = "data_cache.tar.zst"
+EXTRACT_DIR = "/tmp/data_cache"
+
+def ensure_data_extracted():
+    if not os.path.exists(DATA_CACHE):
+        return  # no cache yet – collection not run
+    if os.path.exists(EXTRACT_DIR):
+        return  # already extracted
+    os.makedirs(EXTRACT_DIR, exist_ok=True)
+    try:
+        # Decompress zst to tar
+        subprocess.run(["zstd", "-d", DATA_CACHE, "-o", f"{EXTRACT_DIR}/data.tar"], check=True)
+        # Extract tar
+        subprocess.run(["tar", "-xf", f"{EXTRACT_DIR}/data.tar", "-C", EXTRACT_DIR], check=True)
+        # Cleanup tar
+        os.remove(f"{EXTRACT_DIR}/data.tar")
+    except Exception as e:
+        shutil.rmtree(EXTRACT_DIR, ignore_errors=True)
+        raise RuntimeError(f"Failed to extract data cache: {e}")
+
+ensure_data_extracted()
+
+# --- DATA LOADING (if extracted) ---
+data_path = Path(EXTRACT_DIR) / "data_collection"
+if data_path.exists():
+    # Optional: load CSVs into memory for faster RAG – not required for demo
+    pass
+
+# --- API ENDPOINTS ---
 
 class QueryPayload(BaseModel):
     tracking: str
