@@ -1,3 +1,6 @@
+#(at end, add chmod + x collect all.sh)
+
+
 #!/bin/bash
 set -e
 
